@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Report – Air Pollution Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --text-color: #1f2937;
+            --card-bg: #ffffff;
+            --shadow: rgba(0, 0, 0, 0.05);
+        }
+
+        .dark-theme {
+            --bg-color: #1f2937;
+            --text-color: #f3f4f6;
+            --card-bg: #374151;
+            --shadow: rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', sans-serif;
+            transition: 0.3s;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            box-shadow: 0 4px 6px -1px var(--shadow), 0 2px 4px -2px var(--shadow);
+            border-radius: 0.75rem;
+        }
+
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            border-radius: 12px;
+            transition: all 0.3s;
+            background: #f8fafc;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(to right, #3b82f6, #2563eb);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 235, 0.4);
+        }
+
+        .tab-button:hover:not(.active) {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.15);
+        }
+        /* ADDED: Ensure the video stream display area is always sized correctly */
+        #camera-stream {
+            min-height: 200px; /* Minimum height for video when visible */
+            width: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<div class="bg-gray-100 text-gray-800">
+
+
+    <div id="message-box"
+        class="fixed top-12 right-4 p-3 rounded-lg text-white opacity-0 transition-opacity duration-300 z-50"></div>
+    <div id="loading-indicator"
+        class="fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center hidden flex">
+        <div class="card p-4 rounded-lg flex items-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mr-3"></div>
+            <p id="loading-text">Analyzing...</p>
+        </div>
+    </div>
+    <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                </svg>
+                <h1 class="text-xl font-bold">AirGuard Dehradun</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="text-sm text-right">
+                    <div id="live-clock" class="font-mono font-semibold"></div>
+                    <div class="text-xs opacity-90">Dehradun, UK</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 pt-6 pb-12">
+        <!-- Navigation -->
+        <div class="flex flex-wrap gap-3 p-3 bg-white rounded-2xl shadow-lg mb-8">
+            <button onclick="location.href='dashboard.html'" class="tab-button ">Dashboard</button>
+            <button onclick="location.href='hot.html'" class="tab-button">Hotspots</button>
+            <button onclick="location.href='report.html'" class="tab-button active">Report</button>
+            <button onclick="location.href='awareness.html'" class="tab-button">Awareness</button>
+            <button onclick="location.href='signup.html'" class="tab-button">Sign Up</button>
+            
+        </div>
+
+
+        <div class="p-8 card">
+            <h1 class="text-3xl font-bold text-center mb-8 text-blue-500">Report Pollution</h1>
+
+            <div id="ai-result-box" class="hidden p-4 mb-6 rounded-xl text-center font-bold text-lg border-4"></div>
+
+            <form id="reportForm" class="max-w-xl mx-auto space-y-4">
+                <!-- LOCATION -->
+                <div>
+                    <label class="block text-sm font-medium">Location</label>
+                    <input type="text" id="location" class="mt-1 block w-full rounded-md border p-2" readonly
+                        placeholder="Click below to set location">
+                    <button type="button" id="get-location"
+                        class="mt-2 w-full py-2 bg-blue-600 text-white rounded-xl font-bold">Set Location</button>
+                </div>
+
+                <!-- DESCRIPTION -->
+                <div>
+                    <label class="block text-sm font-medium">Description *</label>
+                    <textarea id="description" rows="3" required class="mt-1 block w-full rounded-md border p-2"
+                        placeholder="e.g., black smoke from chimney"></textarea>
+                </div>
+
+                <!-- HIDDEN FIELDS -->
+                <input type="hidden" id="latitude">
+                <input type="hidden" id="longitude">
+                <input type="hidden" id="captured-image">
+
+                <!-- CAMERA -->
+                <div>
+                    <label class="block text-sm font-medium">Photo * (Required for Verification)</label>
+                    <div class="flex flex-col items-center p-4 border-2 border-dashed rounded-xl">
+                        <video id="camera-stream" autoplay class="hidden w-full max-w-xs rounded-xl"></video>
+                        <img id="camera-preview" class="hidden w-full max-w-xs rounded-xl border-4 border-blue-500"
+                            alt="Photo">
+                        <div class="flex space-x-4 mt-4">
+                            <button type="button" id="start-camera"
+                                class="py-2 px-4 bg-blue-600 text-white rounded-xl font-bold">Start Camera</button>
+                            <button type="button" id="capture-photo"
+                                class="hidden py-2 px-4 bg-green-600 text-white rounded-xl font-bold">Capture</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBMIT -->
+                <button type="submit" class="w-full py-3 bg-red-600 text-white rounded-xl font-bold text-lg">Submit
+                    Report </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // === SUPABASE (Using the existing credentials from the original report.html) ===
+    const SUPABASE_URL = "https://ugkczklrwgoemotljxmj.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVna2N6a2xyd2dvZW1vdGxqeG1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MTMzMjEsImV4cCI6MjA3Nzk4OTMyMX0.aVJPkAguOhqTqJR8bQ9guQalO6-y29z6scRTVDwFqEg";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // === GEMINI 2.5 FLASH ===
+    const GEMINI_API_KEY = "AIzaSyApTdtbw91KfCagqBO1xvGgXd_fN9aqkM0";
+
+    let stream = null;
+
+    function showMessage(msg, isError = false) {
+        const box = document.getElementById('message-box');
+        box.textContent = msg;
+        box.className = `fixed top-12 right-4 p-3 rounded-lg text-white opacity-0 transition-opacity z-50 ${isError ? 'bg-red-500' : 'bg-green-500'}`;
+        box.style.opacity = '1';
+        setTimeout(() => box.style.opacity = '0', 3000);
+    }
+
+    function showLoading(show, text = 'Processing...') {
+        const el = document.getElementById('loading-indicator');
+        el.style.display = show ? 'flex' : 'none';
+        document.getElementById('loading-text').textContent = text;
+    }
+
+    // === LOCATION ===
+    document.getElementById('get-location').onclick = () => {
+        showLoading(true, "Getting Location...");
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                // Success callback
+                (position) => {
+                    showLoading(false);
+                    const lat = position.coords.latitude.toFixed(4);
+                    const lng = position.coords.longitude.toFixed(4);
+
+                    document.getElementById('location').value = `Lat: ${lat}, Lng: ${lng}`;
+                    document.getElementById('latitude').value = lat;
+                    document.getElementById('longitude').value = lng;
+                    showMessage("Live Location Set!");
+                },
+                // Error callback
+                (error) => {
+                    showLoading(false);
+                    let errorMessage = "Location access denied or unavailable.";
+                    if (error.code === error.PERMISSION_DENIED) {
+                        errorMessage = "Location access denied. Please allow location access in your browser settings.";
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        errorMessage = "Location information is unavailable.";
+                    } else if (error.code === error.TIMEOUT) {
+                        errorMessage = "The request to get user location timed out.";
+                    }
+                    document.getElementById('location').value = errorMessage;
+                    showMessage(errorMessage, true);
+                },
+                // Options
+                {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            showLoading(false);
+            const msg = "Geolocation not supported by this browser.";
+            document.getElementById('location').value = msg;
+            showMessage(msg, true);
+        }
+    };
+
+
+    // === CAMERA ===
+    document.getElementById('start-camera').onclick = async () => {
+        try {
+            // Prefer environment camera, fall back to default
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment',
+                    width: 1280,
+                    height: 720
+                }
+            }).catch(() => navigator.mediaDevices.getUserMedia({
+                video: true
+            }));
+
+            const video = document.getElementById('camera-stream');
+            video.srcObject = stream;
+            video.classList.remove('hidden');
+            document.getElementById('capture-photo').classList.remove('hidden');
+            document.getElementById('start-camera').classList.add('hidden');
+            document.getElementById('ai-result-box').classList.add('hidden'); // Clear previous AI result
+        } catch (e) {
+            showMessage("Camera Failed! Allow permission.", true);
+        }
+    };
+
+    document.getElementById('capture-photo').onclick = () => {
+        const video = document.getElementById('camera-stream');
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+        document.getElementById('camera-preview').src = dataUrl;
+        document.getElementById('camera-preview').classList.remove('hidden');
+        document.getElementById('captured-image').value = dataUrl;
+
+        video.classList.add('hidden');
+        document.getElementById('capture-photo').classList.add('hidden');
+        document.getElementById('start-camera').classList.remove('hidden');
+        document.getElementById('start-camera').textContent = "Retake";
+
+        if (stream) stream.getTracks().forEach(t => t.stop());
+    };
+
+    // === GEMINI AI ANALYSIS FUNCTION ===
+    async function analyzeImage(desc, imgBase64) {
+        const payload = {
+            contents: [{
+                role: "user",
+                parts: [{
+                    // Instruction updated to ensure structure is reliable
+                    text: `Analyze the image and the pollution description: "${desc}". Determine if a visible source of air pollution (smoke, dust, discharge) is present AND if the image credibly supports the text. Respond ONLY in JSON format: { "isPollutionDetected": boolean, "isReportCredible": boolean, "summary": "1 sentence analysis" }`
+                }, {
+                    inlineData: {
+                        mimeType: "image/jpeg",
+                        data: imgBase64.split(',')[1]
+                    }
+                }]
+            }],
+            generationConfig: {
+                responseMimeType: "application/json"
+            }
+        };
+
+        for (let i = 0; i < 3; i++) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                
+                // Robust JSON parsing (handles potential markdown code blocks)
+                const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+                const jsonString = jsonMatch ? jsonMatch[1] : text.trim();
+                
+                return JSON.parse(jsonString);
+
+            } catch (e) {
+                console.error(`Attempt ${i+1} failed:`, e);
+                if (i === 2) throw e;
+                await new Promise(r => setTimeout(r, 2000 * Math.pow(2, i))); // Exponential backoff
+            }
+        }
+    }
+
+    // === SUBMIT (Conditional & Photo-less) ===
+    document.getElementById('reportForm').onsubmit = async (e) => {
+        e.preventDefault();
+
+        const loc = document.getElementById('location').value;
+        const desc = document.getElementById('description').value;
+        const lat = document.getElementById('latitude').value;
+        const lng = document.getElementById('longitude').value;
+        const img = document.getElementById('captured-image').value; // Base64 image data
+
+        if (!loc || !desc || !lat || !lng) return showMessage("Please set location and description.", true);
+        if (!img) return showMessage("Please capture a photo first.", true);
+
+
+        // 1. AI Analysis
+        showLoading(true, "Analyzing Photo with AI...");
+
+        let ai;
+        try {
+            ai = await analyzeImage(desc, img);
+        } catch (e) {
+            showLoading(false);
+            return showMessage("AI Analysis Failed. Cannot verify report.", true);
+        }
+
+        // Determine AI verification status (Requires both pollution detected AND credibility)
+        const status = (ai.isPollutionDetected === true && ai.isReportCredible === true) ? "VERIFIED" : "UNVERIFIED";
+        const isVerified = status === "VERIFIED";
+
+        const color = isVerified ? "bg-red-100 border-red-600 text-red-800" : "bg-blue-100 border-blue-600 text-blue-800";
+
+        const box = document.getElementById('ai-result-box');
+        box.innerHTML = `<div class="text-xl font-bold">${status}</div><div class="text-sm mt-1">${ai.summary || 'No summary provided.'}</div>`;
+        box.className = `p-4 mb-6 rounded-xl text-center font-bold text-lg border-4 ${color}`;
+        box.classList.remove('hidden');
+
+        // 2. CONDITIONAL SUBMISSION CHECK: Only submit if VERIFIED
+        if (!isVerified) {
+            showLoading(false);
+            showMessage("Report NOT verified by AI. Data was not submitted to Supabase.", true);
+            return; 
+        }
+
+        // 3. Submission (ONLY if VERIFIED)
+        showLoading(true, "AI Verified! Saving location and description data...");
+
+        // === FINAL DB INSERT PAYLOAD (Excluding photo_url) ===
+        const { error } = await supabase.from('reports').insert({
+            location_name: loc,
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lng),
+            description: desc,
+            ai_status: status, // VERIFIED
+            ai_summary: ai.summary || 'AI confirmed the report.',
+            // photo_url is excluded as requested
+            official_status: 'Pending', 
+        });
+        // === END DB INSERT PAYLOAD ===
+
+
+        if (error) {
+            showLoading(false);
+            return showMessage("Database Error during insert: " + error.message, true);
+        }
+
+        showLoading(false);
+        showMessage("Report Submitted! It is now visible on the Dashboard.", false);
+
+        // Reset Form
+        document.getElementById('description').value = '';
+        document.getElementById('captured-image').value = '';
+        document.getElementById('camera-preview').classList.add('hidden');
+        document.getElementById('start-camera').textContent = "Start Camera";
+    };
+
+    // Remaining non-core functions (Clock, Chatbot)
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('live-clock').textContent = now.toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    document.getElementById('chatbot-btn').onclick = () => {
+        document.getElementById('chatbot-modal').classList.remove('hidden');
+        if (!document.querySelector('#chat-messages > div')) {
+            addBotMsg('Hi! I can help with air pollution health tips, AQI precautions, and safety advice.');
+        }
+    };
+
+    function closeModal() {
+        document.getElementById('chatbot-modal').classList.add('hidden');
+    }
+
+    function addMsg(text, type) {
+        const chat = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = type === 'user' ? 'text-right' : 'text-left';
+        div.innerHTML = `<div class="inline-block max-w-xs p-3 rounded-2xl text-sm ${type === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-800'}">${text}</div>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addBotMsg(text) {
+        addMsg(text, 'bot');
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('user-input');
+        const q = input.value.trim();
+        if (!q) return;
+        addMsg(q, 'user');
+        input.value = '';
+        addBotMsg('Thinking...');
+
+        if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
+            document.querySelector('#chat-messages > div:last-child').remove();
+            addBotMsg('Error: Please add your real Gemini API key!');
+            return;
+        }
+
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: `Answer in clear, short English. Only about air pollution health & precautions: ${q}`
+                        }]
+                    }]
+                })
+            });
+            if (!res.ok) throw new Error(`API Error: ${res.status}`);
+            const data = await res.json();
+            const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.';
+            document.querySelector('#chat-messages > div:last-child').remove();
+            addBotMsg(reply);
+        } catch (e) {
+            document.querySelector('#chat-messages > div:last-child').remove();
+            addBotMsg(`Error: ${e.message}`);
+        }
+    }
+
+    function quickAsk(q) {
+        document.getElementById('user-input').value = q;
+        sendMessage();
+    }
+
+    document.getElementById('user-input').addEventListener('keypress', e => {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>

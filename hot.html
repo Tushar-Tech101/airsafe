@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AirGuard Dehradun — Hotspots (no AQI shown)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(to bottom, #f0f9ff, #e0f2fe);
+      color: #0f172a;
+      min-height: 100vh
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06)
+    }
+
+    .tab-button {
+      padding: 0.6rem 1.2rem;
+      font-weight: 600;
+      border-radius: 10px;
+      transition: all 0.3s;
+      background: #f8fafc;
+      font-size: 0.9rem;
+    }
+
+    .tab-button.active {
+      background: linear-gradient(to right, #3b82f6, #2563eb);
+      color: white;
+      box-shadow: 0 4px 12px rgba(59, 130, 235, 0.3);
+    }
+
+    .tab-button:hover:not(.active) {
+      background: #dbeafe;
+      color: #2563eb;
+    }
+
+    #map {
+      height: 560px;
+      border-radius: 12px;
+      box-shadow: 0 10px 28px rgba(2, 6, 23, 0.08);
+      z-index: 0;
+    }
+
+    .pulse-marker {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ef4444;
+      position: relative;
+      border: 3px solid #fff
+    }
+
+    .pulse-marker::after {
+      content: "";
+      position: absolute;
+      left: -8px;
+      top: -8px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.25);
+      animation: pulse 1.6s infinite;
+      z-index: -1
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(0.7);
+        opacity: 0.6
+      }
+
+      70% {
+        transform: scale(1.6);
+        opacity: 0
+      }
+
+      100% {
+        transform: scale(1.6);
+        opacity: 0
+      }
+    }
+
+    .info-control {
+      background: rgba(255, 255, 255, 0.98);
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      font-size: 13px
+    }
+
+    .ai-badge {
+      display: inline-block;
+      padding: 0.12rem 0.45rem;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700
+    }
+
+    .ai-high {
+      background: #ef4444;
+      color: #fff
+    }
+
+    .ai-medium {
+      background: #f59e0b;
+      color: #fff
+    }
+
+    .ai-low {
+      background: #10b981;
+      color: #fff
+    }
+
+    .label-chip {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid #e6eef8;
+      font-size: 12px;
+      box-shadow: 0 2px 6px rgba(2, 6, 23, 0.06)
+    }
+
+    .control-btn {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      font-size: 13px
+    }
+
+    .small {
+      font-size: 13px
+    }
+
+    .topbar {
+      display: flex;
+      gap: 12px;
+      align-items: center
+    }
+  </style>
+</head>
+
+<body class="min-h-screen">
+
+  <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+        </svg>
+        <h1 class="text-lg font-bold">AirGuard Dehradun</h1>
+      </div>
+      <div class="text-sm text-right">
+        <div id="live-clock" class="font-mono font-semibold text-base">00:00</div>
+        <div class="text-xs opacity-90">Dehradun, UK</div>
+      </div>
+    </div>
+  </header>
+  <div class="max-w-7xl mx-auto px-4 pt-5 pb-10">
+    <!-- NAV -->
+    <div class="flex flex-wrap gap-2 p-2 bg-white rounded-xl shadow-md mb-6">
+      <button onclick="location.href='dashboard.html'" class="tab-button ">Dashboard</button>
+      <button onclick="location.href='hotspot.html'" class="tab-button active">Hotspots</button>
+      <button onclick="location.href='report.html'" class="tab-button">Report</button>
+      <button onclick="location.href='awareness.html'" class="tab-button">Awareness</button>
+      <button onclick="location.href='signup.html'" class="tab-button">Sign Up</button>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <div class="card mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <button id="btn-all" class="control-btn">All</button>
+
+        <input id="search-map" placeholder="Search location (e.g. Gandhi Park)"
+          class="px-3 py-2 border rounded-lg w-64" />
+        <select id="quick-jump" class="px-3 py-2 border rounded-lg">
+          <option value="">Quick jump…</option>
+          <option value="r1">Gandhi Park</option>
+          <option value="r5">ISBT Dehradun</option>
+          <option value="r9">Graphic Era University</option>
+          <option value="r7">Paltan Bazaar</option>
+        </select>
+        <button id="go-jump" class="control-btn">Go</button>
+      </div>
+
+      <div class="flex items-center gap-3 topbar">
+        <label class="small">Heatmap</label>
+        <input id="toggle-heat" type="checkbox" checked />
+        <label class="small">Labels</label>
+        <input id="toggle-labels" type="checkbox" />
+        <label class="small">Auto-refresh</label>
+        <input id="toggle-auto" type="checkbox" />
+        <input id="interval-min" type="number" min="1" value="10"
+          style="width:72px;padding:6px;border-radius:6px;border:1px solid #e5e7eb" title="minutes" />
+        <button id="refresh-now" class="control-btn">Refresh</button>
+        <button id="export-csv" class="control-btn">Export CSV</button>
+      </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="mt-4 card">
+      <h3 class="font-bold">Hotspot Highlights</h3>
+      <ul class="list-disc pl-6 mt-2 small">
+        <li>Popups no longer show AQI numbers — only severity & risk (to avoid misleading values).</li>
+        <li>Toggle heatmap / persistent labels, quick jump, auto-refresh and CSV export added.</li>
+      </ul>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <script>
+    /***** CONFIG: put your OpenWeather key here (optional). Kept internal; not shown on page. *****/
+    const OPENWEATHER_KEY = "YOUR_OPENWEATHER_KEY"; // replace if you have it, or leave empty
+
+    /***** SAMPLE DATA *****/
+    const reports = [
+      { id: 'r1', location: 'Gandhi Park', desc: 'Heavy smoke from waste burning.', lat: 30.3175, lng: 78.0322, intensity: 0.95 },
+      { id: 'r2', location: 'Clock Tower', desc: 'Traffic causing thick smog.', lat: 30.3188, lng: 78.0312, intensity: 0.85 },
+      { id: 'r3', location: 'Rajpur Road', desc: 'Construction dust cloud.', lat: 30.3341, lng: 78.0562, intensity: 0.30 },
+      { id: 'r4', location: 'Doon University', desc: 'Open waste burning near campus.', lat: 30.3228, lng: 78.0561, intensity: 0.98 },
+      { id: 'r5', location: 'ISBT Dehradun', desc: 'Persistent heavy bus & vehicle emissions — traffic hotspot.', lat: 30.3100, lng: 78.0500, intensity: 0.92 },
+      { id: 'r6', location: 'Mussoorie Road', desc: 'Tourist traffic jam.', lat: 30.3500, lng: 78.0700, intensity: 0.75 },
+      { id: 'r7', location: 'Paltan Bazaar', desc: 'Market waste burning.', lat: 30.3250, lng: 78.0400, intensity: 0.90 },
+      { id: 'r8', location: 'Prem Nagar', desc: 'Industrial fumes.', lat: 30.3000, lng: 78.0000, intensity: 0.88 },
+      { id: 'r9', location: 'Graphic Era University', desc: 'Campus-adjacent traffic and local emissions.', lat: 30.3265, lng: 78.0425, intensity: 0.86 },
+      { id: 'r10', location: 'Jakhan', desc: 'Busy residential-commercial area.', lat: 30.3200, lng: 78.0350, intensity: 0.78 },
+      { id: 'r11', location: 'Pacific Mall', desc: 'Shopping/traffic hotspot.', lat: 30.3138, lng: 78.0480, intensity: 0.72 },
+      { id: 'r12', location: 'Tapovan', desc: 'Local traffic and occasional open-burning.', lat: 30.3070, lng: 78.0260, intensity: 0.65 }
+    ];
+
+    /***** STATE *****/
+    let map, heatLayer;
+    let markers = [], rings = [], labelLayers = []; // labelLayers hold persistent label markers
+    const markersMap = {};
+    let currentData = [...reports];
+    let autoRefreshTimer = null;
+
+    /***** HELPERS *****/
+    function estimatedAQI(intensity) { return Math.round(30 + intensity * (500 - 30)); } // internal only; not shown
+    function predict24hRisk(intensity) { const p = Math.min(1, intensity + 0.06 * intensity); return p > 0.85 ? { pred: p, level: 'High' } : p > 0.6 ? { pred: p, level: 'Medium' } : { pred: p, level: 'Low' }; }
+    function generateHealthTips(intensity) {
+      if (intensity > 0.85) return ['Avoid outdoor exercise; stay indoors.', 'Use N95 if you must go out.', 'Keep air purifier running.'];
+      if (intensity > 0.6) return ['Limit heavy outdoor activity.', 'Children & elderly should avoid prolonged outdoor exposure.', 'Use basic indoor filtration.'];
+      return ['Air moderate — ventilate early morning.', 'Use masks in traffic if sensitive.'];
+    }
+
+    /***** MAP INIT *****/
+    function initMap() {
+      map = L.map('map').setView([30.3165, 78.0322], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+      updateHeatmap();
+      addMarkers(currentData);
+      checkForRedAlerts();
+      console.log('[map] ready');
+    }
+
+    function updateHeatmap() {
+      if (heatLayer) map.removeLayer(heatLayer);
+      if (!document.getElementById('toggle-heat').checked) return;
+      const pts = currentData.map(r => [r.lat, r.lng, r.intensity]);
+      heatLayer = L.heatLayer(pts, { radius: 36, blur: 28, maxZoom: 17, gradient: { 0.2: '#10b981', 0.5: '#fbbf24', 1: '#ef4444' } }).addTo(map);
+    }
+
+    function clearMarkers() {
+      markers.forEach(m => map.removeLayer(m)); markers = [];
+      rings.forEach(r => map.removeLayer(r)); rings = [];
+      labelLayers.forEach(l => map.removeLayer(l)); labelLayers = [];
+      for (const k in markersMap) delete markersMap[k];
+    }
+
+    function buildPopupHtml(r) {
+      const severityPct = (r.intensity * 100).toFixed(0) + '%';
+      const pred = predict24hRisk(r.intensity);
+      const tips = generateHealthTips(r.intensity);
+      return `
+      <div style="max-width:300px">
+        <h3 style="font-weight:700;margin-bottom:6px">${r.location}</h3>
+        <div style="font-size:13px;color:#374151">${r.desc}</div>
+        <div style="margin-top:8px;font-size:13px"><strong>Severity:</strong> ${severityPct}
+          <span style="margin-left:8px" class="ai-badge ${pred.level === 'High' ? 'ai-high' : pred.level === 'Medium' ? 'ai-medium' : 'ai-low'}">${pred.level}</span>
+        </div>
+        <div style="margin-top:8px;font-size:13px"><strong>Health Tips:</strong>
+          <ul style="margin-left:14px;margin-top:6px">${tips.map(t => `<li style="margin-bottom:4px">${t}</li>`).join('')}</ul>
+        </div>
+        <div style="text-align:right;margin-top:8px"><button onclick="focusAndHighlight('${r.id}')" style="padding:6px 8px;border-radius:6px;border:1px solid #e5e7eb;background:#fff;font-size:13px">Focus</button></div>
+      </div>`;
+    }
+
+    function addMarkers(data) {
+      clearMarkers();
+      data.forEach(r => {
+        const isRed = r.intensity > 0.8;
+        const color = r.intensity > 0.8 ? '#ef4444' : r.intensity > 0.6 ? '#f97316' : '#10b981';
+        const iconHtml = isRed ? `<div class="pulse-marker" title="Red Alert"></div>` : `<div style="background:${color};width:16px;height:16px;border-radius:50%;border:3px solid #fff"></div>`;
+        const icon = L.divIcon({ className: '', html: iconHtml, iconSize: [22, 22], iconAnchor: [11, 11] });
+        const marker = L.marker([r.lat, r.lng], { icon }).bindPopup(buildPopupHtml(r)).addTo(map);
+        marker._reportId = r.id;
+        markers.push(marker);
+        markersMap[r.id] = marker;
+
+        if (isRed) {
+          const c = L.circle([r.lat, r.lng], { radius: 240, color: '#ef4444', weight: 1, opacity: 0.18, fillOpacity: 0.03 }).addTo(map);
+          rings.push(c);
+        }
+
+        // labels (persistent chips) — only add if toggle-labels checked
+        if (document.getElementById('toggle-labels').checked) {
+          const label = L.marker([r.lat + 0.0003, r.lng], {
+            icon: L.divIcon({ className: 'label-chip', html: r.location, iconAnchor: [0, 0] }),
+            interactive: false
+          }).addTo(map);
+          labelLayers.push(label);
+        }
+      });
+    }
+
+    function focusAndHighlight(reportId) {
+      const report = reports.find(r => r.id === reportId);
+      if (!report) return;
+      map.setView([report.lat, report.lng], 15, { animate: true });
+      const m = markersMap[reportId];
+      if (m && m.openPopup) m.openPopup();
+      const hl = L.circle([report.lat, report.lng], { radius: 120, color: '#2563eb', weight: 2, opacity: 0.7, dashArray: '6' }).addTo(map);
+      setTimeout(() => map.removeLayer(hl), 3200);
+    }
+    window.focusAndHighlight = focusAndHighlight;
+
+    function checkForRedAlerts() {
+      if (window.infoControl) { map.removeControl(window.infoControl); window.infoControl = null; }
+      const dehradunBounds = L.latLngBounds([30.28, 77.98], [30.38, 78.09]);
+      const red = currentData.filter(r => r.intensity > 0.8 && dehradunBounds.contains([r.lat, r.lng]));
+      if (red.length > 0) {
+        window.infoControl = L.control({ position: 'topright' });
+        window.infoControl.onAdd = function () {
+          const div = L.DomUtil.create('div', 'info-control');
+          div.innerHTML = `<strong style="color:#ef4444">Red Alert: ${red.length}</strong><div style="margin-top:6px;font-size:13px">Click a red marker for details.</div><div style="margin-top:8px"><button onclick="zoomToFirstRed()" style="padding:6px;border-radius:6px;border:1px solid #e5e7eb">Go to first</button></div>`;
+          return div;
+        };
+        window.infoControl.addTo(map);
+        focusAndHighlight(red.sort((a, b) => b.intensity - a.intensity)[0].id);
+      } else {
+        window.infoControl = L.control({ position: 'topright' });
+        window.infoControl.onAdd = function () { const div = L.DomUtil.create('div', 'info-control'); div.innerHTML = `<strong style="color:#10b981">All Clear — No Red Alerts</strong><div style="margin-top:6px;font-size:13px">No central Dehradun locations exceed the red threshold.</div>`; return div; };
+        window.infoControl.addTo(map);
+        // center map on city
+        map.setView([30.3165, 78.0322], 12, { animate: false });
+      }
+    }
+
+    function zoomToFirstRed() {
+      const dehradunBounds = L.latLngBounds([30.28, 77.98], [30.38, 78.09]);
+      const red = currentData.filter(r => r.intensity > 0.8 && dehradunBounds.contains([r.lat, r.lng]));
+      if (red.length > 0) focusAndHighlight(red.sort((a, b) => b.intensity - a.intensity)[0].id);
+      else alert('No red alerts found.');
+    }
+
+    /***** SEARCH & QUICK-JUMP *****/
+    document.getElementById('search-map').addEventListener('input', debounce(applyFilters, 250));
+    document.getElementById('go-jump').addEventListener('click', () => {
+      const val = document.getElementById('quick-jump').value;
+      if (val) focusAndHighlight(val);
+    });
+
+    function applyFilters() {
+      const q = (document.getElementById('search-map').value || '').trim().toLowerCase();
+      if (!q) { currentData = [...reports]; updateHeatmap(); addMarkers(currentData); checkForRedAlerts(); return; }
+      currentData = reports.filter(r => (r.location || '').toLowerCase().includes(q) || (r.desc || '').toLowerCase().includes(q));
+      updateHeatmap(); addMarkers(currentData); checkForRedAlerts();
+      if (currentData.length > 0) {
+        setTimeout(() => { const m = markersMap[currentData[0].id]; if (m && m.openPopup) { m.openPopup(); map.setView([currentData[0].lat, currentData[0].lng], 14, { animate: true }); } }, 450);
+      } else showTempNotice('No hotspots found for your search.');
+    }
+
+    function debounce(fn, ms) { let t; return function (...a) { clearTimeout(t); t = setTimeout(() => fn.apply(this, a), ms); }; }
+
+    /***** CSV EXPORT *****/
+    function exportCSV() {
+      const rows = [['id', 'location', 'lat', 'lng', 'intensity', 'desc']];
+      reports.forEach(r => rows.push([r.id, r.location, r.lat, r.lng, r.intensity.toFixed(3), `"${(r.desc || '').replace(/"/g, '""')}"`]));
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `hotspots_${(new Date()).toISOString().slice(0, 19)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+    document.getElementById('export-csv').addEventListener('click', exportCSV);
+
+    /***** LIVE FETCH (OpenWeather) *****/
+    // Utilities: pm2.5 -> AQI -> intensity map (we keep AQI internal only)
+    function pm25ToAQI(pm25) {
+      const bp = [{ cl: 0, ch: 12, il: 0, ih: 50 }, { cl: 12.1, ch: 35.4, il: 51, ih: 100 }, { cl: 35.5, ch: 55.4, il: 101, ih: 150 }, { cl: 55.5, ch: 150.4, il: 151, ih: 200 }, { cl: 150.5, ch: 250.4, il: 201, ih: 300 }, { cl: 250.5, ch: 350.4, il: 301, ih: 400 }, { cl: 350.5, ch: 500.4, il: 401, ih: 500 }];
+      for (const b of bp) if (pm25 >= b.cl && pm25 <= b.ch) return Math.round(((b.ih - b.il) / (b.ch - b.cl)) * (pm25 - b.cl) + b.il);
+      return 500;
+    }
+    function aqiFromOW(resp) {
+      const d = resp.list?.[0];
+      if (!d) return null;
+      if (d.components?.pm2_5 != null) return pm25ToAQI(d.components.pm2_5);
+      if (d.main?.aqi) return [0, 25, 75, 125, 175, 300][d.main.aqi] || null;
+      return null;
+    }
+    function aqiToIntensity(aqi) {
+      if (!aqi) return null;
+      const min = 30, max = 500; return Math.max(0, Math.min(1, (aqi - min) / (max - min)));
+    }
+
+    async function fetchAQIFor(lat, lng) {
+      if (!OPENWEATHER_KEY) return null;
+      const url = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lng}&appid=${OPENWEATHER_KEY}`;
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        return aqiFromOW(j);
+      } catch (e) {
+        console.warn('fetch error', e);
+        return null;
+      }
+    }
+
+    async function fetchLiveAll() {
+      if (!OPENWEATHER_KEY) { showTempNotice('OpenWeather key not configured. Live fetch skipped.'); return; }
+      showTempNotice('Fetching live data...', 2000);
+      const promises = reports.map(async rep => {
+        const aqi = await fetchAQIFor(rep.lat, rep.lng);
+        if (aqi != null) {
+          const intensity = aqiToIntensity(aqi);
+          rep.intensity = intensity;
+          // append small note but keep UI not showing numeric AQI
+          rep.desc = (rep.desc.split(' | live:')[0]) + ` | live data`;
+        }
+      });
+      await Promise.all(promises);
+      currentData = [...reports];
+      updateHeatmap(); addMarkers(currentData); checkForRedAlerts();
+      document.getElementById('last-updated').textContent = 'Last update: ' + new Date().toLocaleString();
+    }
+
+    // Auto-refresh handling
+    document.getElementById('toggle-auto').addEventListener('change', (e) => {
+      if (e.target.checked) { startAutoRefresh(); } else { stopAutoRefresh(); }
+    });
+    document.getElementById('refresh-now').addEventListener('click', () => fetchLiveAll());
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      const mins = Math.max(1, parseInt(document.getElementById('interval-min').value || 10));
+      autoRefreshTimer = setInterval(() => fetchLiveAll(), mins * 60 * 1000);
+      showTempNotice('Auto-refresh started (' + mins + ' min interval)', 2000);
+    }
+    function stopAutoRefresh() { if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; showTempNotice('Auto-refresh stopped', 1500); } }
+
+    /***** UI TOGGLES *****/
+    document.getElementById('toggle-heat').addEventListener('change', () => { updateHeatmap(); });
+    document.getElementById('toggle-labels').addEventListener('change', () => { addMarkers(currentData); });
+
+    /***** TEMP NOTICE (small floating message) *****/
+    function showTempNotice(msg, duration = 2000) {
+      let el = document.getElementById('temp-notice');
+      if (!el) { el = document.createElement('div'); el.id = 'temp-notice'; el.style.position = 'fixed'; el.style.right = '16px'; el.style.bottom = '18px'; el.style.background = 'rgba(0,0,0,0.7)'; el.style.color = '#fff'; el.style.padding = '8px 12px'; el.style.borderRadius = '10px'; el.style.zIndex = 99999; document.body.appendChild(el); }
+      el.textContent = msg;
+      el.style.opacity = '1';
+      setTimeout(() => { el.style.opacity = '0'; }, duration);
+    }
+
+    /***** CLOCK *****/
+    function updateClock() { document.getElementById('live-clock').textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); }
+    setInterval(updateClock, 1000); updateClock();
+
+    /***** INIT *****/
+    window.addEventListener('load', async () => {
+      initMap();
+      // try one live fetch silently (no numbers shown anyway)
+      if (OPENWEATHER_KEY) {
+        await fetchLiveAll().catch(e => console.warn(e));
+      } else {
+        console.log('[AirGuard] OPENWEATHER_KEY not set — live data disabled.');
+      }
+    });
+
+  </script>
+  <!-- CHATBOT BUTTON -->
+  <button id="chatbot-btn"
+    class="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-all duration-300 z-50 flex items-center justify-center border-4 border-white"
+    aria-label="Open Health Assistant">
+    <img src="https://cdn-icons-png.flaticon.com/512/4712/4712027.png" alt="Health Bot" class="w-8 h-8 animate-pulse">
+  </button>
+
+  <!-- CHATBOT MODAL -->
+  <div id="chatbot-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 p-4"
+    role="dialog" aria-modal="true">
+    <div
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto overflow-hidden flex flex-col h-[90vh] max-h-[600px]">
+      <div class="bg-gradient-to-r from-blue-600 to-cyan-500 text-white p-4 flex justify-between items-center">
+        <h3 class="font-bold text-lg">Health AI Assistant</h3>
+        <button id="chat-close" class="text-white hover:text-gray-200 text-2xl" aria-label="Close assistant">×</button>
+      </div>
+
+      <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50" aria-live="polite"></div>
+
+      <div class="p-3 border-t bg-gray-100">
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <button class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200"
+            onclick="quickAsk('What to do when AQI is 150?')">AQI 150</button>
+          <button class="text-xs bg-green-100 text-green-700 px-3 py-2 rounded-lg font-medium hover:bg-green-200"
+            onclick="quickAsk('Precautions for children')">Kids</button>
+          <button class="text-xs bg-orange-100 text-orange-700 px-3 py-2 rounded-lg font-medium hover:bg-orange-200"
+            onclick="quickAsk('How to wear N95 mask?')">N95 Mask</button>
+          <button class="text-xs bg-purple-100 text-purple-700 px-3 py-2 rounded-lg font-medium hover:bg-purple-200"
+            onclick="quickAsk('How to reduce indoor pollution?')">Indoor Tips</button>
+        </div>
+
+        <div class="flex items-center gap-2 mb-3">
+          <select id="language-select"
+            class="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500"
+            aria-label="Select language">
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+            <option value="pa">Punjabi</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="ar">Arabic</option>
+          </select>
+
+          <label class="flex items-center gap-2 text-sm">
+            <input id="enable-tts" type="checkbox" aria-checked="false" />
+            <span>Speak replies</span>
+          </label>
+
+          <button id="voice-btn" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium"
+            aria-pressed="false">🎤 Speak</button>
+        </div>
+
+        <div class="flex gap-1">
+          <input id="user-input" type="text" placeholder="Ask health tips..."
+            class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autocomplete="off" aria-label="Type your question">
+          <button id="send-btn"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-lg font-bold text-sm">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHATBOT SCRIPT: voice + TTS fixed -->
+  <script>
+    /* Config: your API key (as you requested earlier, using client-side) */
+    const GEMINI_API_KEY = "AIzaSyBVVbAD7NN_gJozwIY783ncQwwR_GDFwnQ";
+
+    /* DOM */
+    const chatbotBtn = document.getElementById('chatbot-btn');
+    const modal = document.getElementById('chatbot-modal');
+    const chatClose = document.getElementById('chat-close');
+    const messages = document.getElementById('chat-messages');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const langSelect = document.getElementById('language-select');
+    const voiceBtn = document.getElementById('voice-btn');
+    const ttsToggle = document.getElementById('enable-tts');
+
+    let awaiting = false;               // prevents double sends
+    let recognition = null;
+    let recognitionActive = false;
+
+    /* Feature detection for speech recognition */
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onstart = () => {
+        recognitionActive = true;
+        voiceBtn.textContent = '🎙️ Listening...';
+        voiceBtn.classList.replace('bg-red-500', 'bg-green-500');
+        voiceBtn.setAttribute('aria-pressed', 'true');
+      };
+      recognition.onend = () => {
+        recognitionActive = false;
+        voiceBtn.textContent = '🎤 Speak';
+        voiceBtn.classList.replace('bg-green-500', 'bg-red-500');
+        voiceBtn.setAttribute('aria-pressed', 'false');
+      };
+      recognition.onnomatch = () => {
+        addBotMsg("I didn't catch that — please try again.", false);
+      };
+      recognition.onerror = (ev) => {
+        console.warn('SpeechRecognition error', ev);
+        addBotMsg("Voice input error: " + (ev.error || 'unknown'), false);
+        try { recognition.stop(); } catch (e) { }
+      };
+      recognition.onresult = (ev) => {
+        const transcript = ev.results[0][0].transcript;
+        userInput.value = transcript;
+        // auto-send recognized text
+        sendMessage();
+      };
+    } else {
+      // disable voice button if unsupported
+      voiceBtn.disabled = true;
+      voiceBtn.title = 'Voice input not supported in this browser';
+    }
+
+    /* helper: add user/bot messages */
+    function addMsg(text, who = 'bot', opts = { speak: false }) {
+      const div = document.createElement('div');
+      div.className = who === 'user' ? 'text-right' : 'text-left';
+      div.innerHTML = `<div class="inline-block max-w-xs p-3 rounded-2xl text-sm ${who === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-800'}">${text}</div>`;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+      if (opts.speak && ttsToggle.checked) speakText(text);
+    }
+    function addBotMsg(text, speakIfToggled = true) { addMsg(text, 'bot', { speak: !!speakIfToggled }); }
+
+    /* TTS safely: cancel any existing speech and stop recognition while speaking */
+    function speakText(text) {
+      try { window.speechSynthesis.cancel(); } catch (e) { }
+      // stop recognition if running to avoid loop
+      try { if (recognition && recognitionActive) recognition.stop(); } catch (e) { }
+      const ut = new SpeechSynthesisUtterance(text);
+      ut.lang = getLangCode(langSelect.value);
+      ut.rate = 1; ut.pitch = 1;
+      ut.onerror = (e) => console.warn('TTS error', e);
+      // onend: nothing auto-resumed - user can press mic
+      window.speechSynthesis.speak(ut);
+    }
+
+    /* small helpers for language */
+    function getLangCode(code) {
+      switch (code) {
+        case 'hi': return 'hi-IN';
+        case 'pa': return 'pa-IN';
+        case 'es': return 'es-ES';
+        case 'fr': return 'fr-FR';
+        case 'ar': return 'ar-SA';
+        default: return 'en-US';
+      }
+    }
+    function getLanguageName(code) {
+      switch (code) {
+        case 'hi': return 'Hindi';
+        case 'pa': return 'Punjabi';
+        case 'es': return 'Spanish';
+        case 'fr': return 'French';
+        case 'ar': return 'Arabic';
+        default: return 'English';
+      }
+    }
+
+    /* parse Generative API shapes robustly */
+    function parseGenResponse(json) {
+      try {
+        if (!json) return null;
+        if (json?.candidates?.[0]?.content?.parts?.[0]?.text) return json.candidates[0].content.parts[0].text;
+        if (json?.candidates?.[0]?.content?.[0]?.text) return json.candidates[0].content[0].text;
+        if (json?.output && typeof json.output === 'string') return json.output;
+        if (json?.items?.length) return json.items.map(i => i?.text).filter(Boolean).join(' ');
+        if (json?.candidates?.[0]?.text) return json.candidates[0].text;
+      } catch (e) { console.warn('parseGenResponse', e); }
+      return null;
+    }
+
+    /* fetch with timeout utility */
+    function fetchWithTimeout(resource, options = {}) {
+      const { timeout = 12000 } = options;
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      return fetch(resource, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
+    }
+
+    /* core call to Google Generative endpoint (client-side) */
+    async function callGenerative(promptText) {
+      if (!GEMINI_API_KEY) throw new Error('API key not set');
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const payload = { contents: [{ parts: [{ text: promptText }] }] };
+      const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        timeout: 12000
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '<no body>');
+        throw new Error('HTTP ' + res.status + ' - ' + body.slice(0, 200));
+      }
+      const j = await res.json();
+      const parsed = parseGenResponse(j);
+      return parsed;
+    }
+
+    /* sendMessage wrapper with retry and fallback */
+    async function sendMessage() {
+      if (awaiting) return;
+      const q = userInput.value.trim();
+      if (!q) return;
+      awaiting = true;
+      sendBtn.disabled = true;
+
+      addMsg(q, 'user', { speak: false });
+      userInput.value = '';
+      addBotMsg('Thinking...', false);
+
+      const lang = getLanguageName(langSelect.value);
+      const prompt = `Reply briefly in ${lang}. Topic: Air pollution health & precautions. Question: ${q}`;
+
+      let reply = null;
+      try {
+        try {
+          reply = await callGenerative(prompt);
+        } catch (errPrimary) {
+          console.warn('Primary call failed:', errPrimary);
+          // single retry
+          try { reply = await callGenerative(prompt); } catch (errRetry) { console.warn('Retry failed:', errRetry); }
+        }
+
+        // remove "Thinking..." node
+        const last = document.querySelector('#chat-messages > div:last-child');
+        if (last && last.textContent && last.textContent.includes('Thinking')) last.remove();
+
+        if (reply) {
+          addBotMsg(reply, true);
+        } else {
+          // friendly fallback
+          addBotMsg("Sorry — I'm having trouble generating a reply right now. Try again in a moment.", true);
+        }
+      } catch (finalErr) {
+        console.error('Chatbot final error:', finalErr);
+        const last = document.querySelector('#chat-messages > div:last-child');
+        if (last && last.textContent && last.textContent.includes('Thinking')) last.remove();
+        addBotMsg('Unexpected error. Check console for details.', false);
+      } finally {
+        awaiting = false;
+        sendBtn.disabled = false;
+      }
+    }
+
+    /* UI wiring */
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+    function quickAsk(q) { userInput.value = q; sendMessage(); }
+    window.quickAsk = quickAsk;
+
+    /* voice button behaviour */
+    voiceBtn.addEventListener('click', () => {
+      if (!recognition) {
+        addBotMsg('Voice input not supported in this browser.', false);
+        return;
+      }
+
+      // if TTS speaking, do not start recognition
+      if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        addBotMsg('Please wait until the assistant finishes speaking.', false);
+        return;
+      }
+
+      // ensure recognition language matches selection
+      try { recognition.lang = getLangCode(langSelect.value); } catch (e) { console.warn('could not set recognition.lang', e); }
+
+      if (!recognitionActive) {
+        // cancel any TTS (safety)
+        try { window.speechSynthesis.cancel(); } catch (e) { }
+        try { recognition.start(); } catch (e) { console.warn('recognition.start error', e); addBotMsg('Could not start microphone. Check microphone permissions.', false); }
+      } else {
+        try { recognition.stop(); } catch (e) { console.warn('recognition.stop error', e); }
+      }
+    });
+
+    /* open / close handlers */
+    chatbotBtn.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+      // show welcome text visually only (no auto TTS)
+      if (!document.querySelector('#chat-messages > div')) addBotMsg("👋 Hi! Ask about air quality safety, masks or precautions. Use the mic button to speak.", false);
+    });
+
+    chatClose.addEventListener('click', () => {
+      try { window.speechSynthesis.cancel(); } catch (e) { }
+      try { if (recognition && recognitionActive) recognition.stop(); } catch (e) { }
+      modal.classList.add('hidden');
+    });
+
+    /* stop recognition / tts on unload */
+    window.addEventListener('beforeunload', () => {
+      try { window.speechSynthesis.cancel(); } catch (e) { }
+      try { if (recognition && recognitionActive) recognition.stop(); } catch (e) { }
+    });
+
+    /* Esc to close modal */
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+        chatClose.click();
+      }
+    });
+
+    /* small UX: disable voice button if no permission or unsupported (already handled) */
+    /* debug hint */
+    console.log('[Chatbot] voice support:', !!recognition, 'speechSynthesis:', !!window.speechSynthesis);
+
+  </script>
+
+
+</body>
+
+</html>

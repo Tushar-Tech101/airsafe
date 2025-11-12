@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard – AirGuard Dehradun</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:,">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom, #f0f9ff, #e0f2fe);
+            color: #1e293b;
+            min-height: 100vh;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+            padding: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .tab-button {
+            padding: 0.6rem 1.2rem;
+            font-weight: 600;
+            border-radius: 10px;
+            transition: all 0.3s;
+            background: #f8fafc;
+            font-size: 0.9rem;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(to right, #3b82f6, #2563eb);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 235, 0.3);
+        }
+
+        .aqi-circle {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: white;
+            margin: 0 auto;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+        }
+
+        /* AQI Category Colors */
+        .aqi-bg-good {
+            background: #009966;
+        }
+
+        .aqi-bg-moderate {
+            background: #ffde33;
+            color: #1e293b;
+        }
+
+        .aqi-bg-sensitive {
+            background: #ff9933;
+        }
+
+        .aqi-bg-unhealthy {
+            background: #cc0033;
+        }
+
+        .aqi-bg-very-unhealthy {
+            background: #660099;
+        }
+
+        .aqi-bg-hazardous {
+            background: #7e0023;
+        }
+
+
+        #alert-banner {
+            background: linear-gradient(90deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 0.75rem;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        #alert-banner.show {
+            display: block;
+        }
+
+        .report-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            background: #fdfdfd;
+            transition: transform 0.2s;
+        }
+
+        .report-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .priority-high {
+            background: #ef4444;
+            color: white;
+            font-weight: 600;
+            border-radius: 0.4rem;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.7rem;
+        }
+
+        .priority-med {
+            background: #f59e0b;
+            color: white;
+            font-weight: 600;
+            border-radius: 0.4rem;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.7rem;
+        }
+
+        .priority-low {
+            background: #10b981;
+            color: white;
+            font-weight: 600;
+            border-radius: 0.4rem;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.7rem;
+        }
+
+        .mini-map {
+            z-index: 0;
+            height: 120px;
+            border-radius: 8px;
+            background: #f1f5f9;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .mini-map:hover {
+            transform: scale(1.02);
+        }
+
+        /* Ensures the chart container has a minimum size */
+        .chart-container {
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <!-- HEADER -->
+    <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                </svg>
+                <h1 class="text-lg font-bold">AirGuard Dehradun</h1>
+            </div>
+            <div class="text-sm text-right">
+                <div id="live-clock" class="font-mono font-semibold text-base">00:00</div>
+                <div class="text-xs opacity-90">Dehradun, UK</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ALERT BANNER -->
+    <div id="alert-banner">⚠ You are currently in a polluted zone. Stay indoors and wear a mask.</div>
+
+    <!-- ALERT POPUP -->
+    <div id="alert-popup" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden flex items-center justify-center p-4">
+        <div class="card max-w-sm w-full p-5 text-center">
+            <h3 class="text-xl font-bold text-red-600 mb-2">AQI Alert!</h3>
+            <p id="aqi-status-warning" class="text-base font-semibold mb-2">AQI: --</p>
+            <ul id="precautions-list" class="text-left text-xs mb-3 space-y-1"></ul>
+            <button onclick="document.getElementById('alert-popup').classList.add('hidden')"
+                class="bg-blue-600 text-white px-5 py-1.5 rounded-full font-bold text-sm hover:bg-blue-700">Got
+                it</button>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="max-w-7xl mx-auto px-4 pt-5 pb-10">
+        <!-- NAV -->
+        <div class="flex flex-wrap gap-2 p-2 bg-white rounded-xl shadow-md mb-6">
+            <button onclick="location.href='dashboard.html'" class="tab-button active">Dashboard</button>
+            <button onclick="location.href='hot.html'" class="tab-button">Hotspots</button>
+            <button onclick="location.href='report.html'" class="tab-button">Report</button>
+            <button onclick="location.href='awareness.html'" class="tab-button">Awareness</button>
+            <button onclick="location.href='signup.html'" class="tab-button">Sign Up</button>
+        </div>
+
+        <!-- TOP CARDS -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="card text-center">
+                <div class="aqi-circle" id="aqi-circle"><span id="aqi-value">--</span></div>
+                <p class="text-xs mt-1 font-medium">Live AQI</p>
+            </div>
+
+            <div class="card text-center">
+                <p class="text-2xl font-bold text-blue-600" id="temp-value">--°C</p>
+                <p class="text-xs text-gray-600" id="weather-desc">Fetching...</p>
+            </div>
+
+            <div class="card text-center">
+                <p class="text-2xl font-bold text-green-600" id="total-reports-count">0</p>
+                <p class="text-xs text-gray-600">Total Reports</p>
+            </div>
+
+            <div class="card text-center">
+                <p class="text-2xl font-bold text-orange-600" id="open-reports-count">0</p>
+                <p class="text-xs text-gray-600">Open Cases</p>
+            </div>
+        </div>
+
+        <!-- SEARCH + FILTER -->
+        <div class="card mb-5 p-3 flex flex-col md:flex-row gap-2">
+            <input type="text" id="search-input" placeholder="Search location..."
+                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select id="status-filter"
+                class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="all">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+            </select>
+            <button id="export-btn"
+                class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-5 py-2 rounded-lg font-bold text-sm hover:from-green-600 hover:to-emerald-700 shadow-sm">
+                Export CSV
+            </button>
+        </div>
+
+        <!-- CHARTS -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+            <div class="lg:col-span-2 card">
+                <h3 class="text-base font-bold mb-3">24-Hour AQI Trend</h3>
+                <div class="chart-container">
+                    <canvas id="aqi-trend-chart" height="70"></canvas>
+                </div>
+            </div>
+            <div class="card flex flex-col items-center justify-center">
+                <h3 class="text-base font-bold mb-2 text-center">Pollution Sources</h3>
+                <div id="pollution-pie-container" class="chart-container w-full max-w-[200px]">
+                    <canvas id="pollution-pie-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- REPORTS -->
+        <h2 class="text-xl font-bold mb-4 flex items-center">
+            <svg class="w-5 h-5 mr-2 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg> Recent Reports
+        </h2>
+        <div id="reports-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    </div>
+
+    <script>
+        // ---------------- CONFIG ----------------
+        // !!! IMPORTANT: REPLACE 'YOUR_WAQI_TOKEN' with your actual WAQI API token !!!
+        const WAQI_TOKEN = 'd8476f7ec0b7b5152372f9606ed61c9ffe3f6773';
+        // Using geo: lat;lng for Dehradun coordinates (Approx 30.3165, 78.0322)
+        const AQI_API_URL = 'https://api.waqi.info/feed/geo:30.3165;78.0322/?token=' + WAQI_TOKEN;
+
+        // **SUPABASE CONFIG**
+        // Using the same credentials as report.html for consistency (xusphoolbnkzulztyljs)
+        const SUPABASE_URL = "https://ugkczklrwgoemotljxmj.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVna2N6a2xyd2dvZW1vdGxqeG1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MTMzMjEsImV4cCI6MjA3Nzk4OTMyMX0.aVJPkAguOhqTqJR8bQ9guQalO6-y29z6scRTVDwFqEg";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        emailjs.init("jmWgcHe4TWMR6ez9w");
+
+        let alertSent = false;
+        let allReports = [];
+
+        // ---------------- STATIC REPORTS ----------------
+        const staticReports = [
+            { id: 'r1', location: 'Gandhi Park', desc: 'Heavy smoke from waste burning near park entrance.', status: 'Pending', lat: 30.3165, lng: 78.0322, time: Date.now() - 3600000, user: 'User 123' },
+            { id: 'r2', location: 'Clock Tower', desc: 'Traffic causing thick smog and reduced visibility.', status: 'In Progress', lat: 30.3255, lng: 78.0339, time: Date.now() - 7200000, user: 'User 456' },
+            { id: 'r3', location: 'Rajpur Road', desc: 'Construction dust cloud affecting nearby shops.', status: 'Resolved', lat: 30.326, lng: 78.0562, time: Date.now() - 10800000, user: 'User 789' }
+        ];
+
+        // ---------------- AQI CATEGORY MAPPER ----------------
+        function getAQICategory(aqi) {
+            if (aqi <= 50) {
+                return { color_class: 'aqi-bg-good' };
+            } else if (aqi <= 100) {
+                return { color_class: 'aqi-bg-moderate' };
+            } else if (aqi <= 150) {
+                return { color_class: 'aqi-bg-sensitive' };
+            } else if (aqi <= 200) {
+                return { color_class: 'aqi-bg-unhealthy' };
+            } else if (aqi <= 300) {
+                return { color_class: 'aqi-bg-very-unhealthy' };
+            } else {
+                return { color_class: 'aqi-bg-hazardous' };
+            }
+        }
+
+        // ---------------- CLOCK ----------------
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('live-clock').textContent =
+                now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // ---------------- AQI FETCH (FIXED FOR DIRECT WAQI CALL) ----------------
+        async function fetchLiveAQI() {
+            if (WAQI_TOKEN === 'YOUR_WAQI_TOKEN') {
+                console.warn("Please replace the placeholder WAQI_TOKEN with your actual API key.");
+            }
+
+            try {
+                // Direct fetch (WAQI is generally CORS friendly)
+                const resp = await fetch(AQI_API_URL);
+
+                if (!resp.ok) {
+                    throw new Error(`HTTP error! status: ${resp.status}`);
+                }
+
+                // Parse the response directly, no proxy needed
+                const json = await resp.json();
+
+                if (json.status !== 'ok' || !json.data) {
+                    // Check if the API explicitly returns an error message
+                    const apiError = json.data?.message || 'Invalid response structure (Check token/URL).';
+                    throw new Error(`WAQI API Error: ${apiError}`);
+                }
+
+                const aqi = json.data.aqi || 175;
+                // WAQI temp is usually in Celsius (t)
+                const temp = json.data.iaqi?.t?.v || 'N/A';
+                // Get PM values for pie chart, using reliable defaults if they don't exist
+                const pm25 = json.data.iaqi?.pm25?.v || 60;
+                const pm10 = json.data.iaqi?.pm10?.v || 80;
+
+                updateUI(aqi, temp, pm25, pm10);
+                if (aqi > 150) await handleHighAQI(aqi);
+                else await resetAlertFlag();
+
+            } catch (e) {
+                console.error("Failed to fetch live AQI:", e);
+                // Fallback UI
+                const fallbackAqi = 175;
+                updateUI(fallbackAqi, 'N/A', 60, 80);
+                await handleHighAQI(fallbackAqi);
+            }
+        }
+
+        // ---------------- POLLUTION PIE CHART SCRIPT (Separate Function) ----------------
+        let pieChart; // Declare global scope variable for Chart instance
+
+        function renderPollutionPieChart(pm25, pm10) {
+            const pieCtx = document.getElementById('pollution-pie-chart')?.getContext('2d');
+
+            // Calculate a simple 'Others' value based on PMs being max 200
+            const othersValue = Math.max(0, 200 - pm25 - pm10);
+
+            if (pieCtx) {
+                if (window.pieChart) window.pieChart.destroy();
+                window.pieChart = new Chart(pieCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['PM2.5', 'PM10', 'Others'],
+                        datasets: [{
+                            data: [pm25, pm10, othersValue],
+                            backgroundColor: ['#ef4444', '#f59e0b', '#10b981']
+                        }]
+                    },
+                    options: { plugins: { legend: { position: 'bottom' } } }
+                });
+            }
+        }
+
+
+        // ---------------- UI UPDATE ----------------
+        function updateUI(aqi, temp, pm25, pm10) {
+            const aqiData = getAQICategory(aqi);
+
+            // Check if the context for the charts is available before drawing
+            const trendCtx = document.getElementById('aqi-trend-chart')?.getContext('2d');
+
+            // Update AQI circle and text
+            document.getElementById('aqi-value').textContent = aqi;
+            document.getElementById('aqi-circle').className = 'aqi-circle ' + aqiData.color_class;
+
+            // Update temperature and status text
+            document.getElementById('temp-value').textContent = temp !== 'N/A' ? `${temp}°C` : 'N/A';
+            document.getElementById('weather-desc').textContent = aqiData.aqi_text;
+
+            document.getElementById('alert-banner').classList.toggle('show', aqi > 150);
+
+            // --- AQI TREND CHART ---
+            if (trendCtx) {
+                const trend = Array.from({ length: 23 }, () => Math.floor(Math.random() * 40) + 100);
+                trend.push(aqi);
+                if (window.trendChart) window.trendChart.destroy();
+                window.trendChart = new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+                        datasets: [{ data: trend, borderColor: '#ef4444', fill: true, tension: 0.3, backgroundColor: 'rgba(239,68,68,0.2)' }]
+                    },
+                    options: { plugins: { legend: { display: false } } }
+                });
+            }
+
+            // --- CALL SEPARATE PIE CHART FUNCTION ---
+            renderPollutionPieChart(pm25, pm10);
+        }
+
+        // ---------------- HANDLE HIGH AQI ----------------
+        async function handleHighAQI(aqi) {
+            console.log("🚨 handleHighAQI triggered with AQI =", aqi);
+
+            alertsent = false;
+
+            const { data: alerted } = await supabase.from('alert_log').select('email');
+            const existing = alerted ? alerted.map(a => a.email) : [];
+
+            const { data: users } = await supabase.from('users').select('name,email');
+
+            let sentCount = 0;
+
+            for (const u of users || []) {
+                if (existing.includes(u.email)) continue;
+
+                try {
+                    // EmailJS alert email send
+                    await emailjs.send("service_uhpmda4", "template_c59yg8r", {
+                        name: u.name,
+                        email: u.email,
+                        aqi
+                    });
+                    // --- Send SMS alert (via local proxy) ---
+                    try {
+                        await fetch("http://localhost:3000/send-sms", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                numbers: u.phone,
+                                message: '⚠ AirGuard Alert: AQI ${ aqi } detected in your area.Stay indoors and wear a mask.'
+    })
+                    });
+                    console.log("📱 SMS sent to:", u.phone);
+                } catch (smsErr) {
+                    console.error("SMS send failed:", smsErr);
+                }
+
+                // Supabase logging
+                await supabase.from('alert_log').insert([{ email: u.email, status: 'active' }]);
+                console.log("📧 Alert email sent to:", u.email);
+                sentCount++;
+            } catch (err) {
+                console.error("❌ Failed for", u.email, err);
+            }
+        }
+
+        if (sentCount > 0) {
+            console.log('✅ Sent ${sentCount} alert email(s) successfully.');
+        } else {
+            console.warn("⚠ No new alerts sent (either already alerted or no users).");
+        }
+
+        alertSent = true;
+        showAlertPopup(aqi);
+}
+
+        async function resetAlertFlag() {
+            if (!alertSent) return;
+            alertSent = false;
+            await supabase.from('alert_log').delete().neq('email', '');
+        }
+
+        function showAlertPopup(aqi) {
+            const aqiText = getAQICategory(aqi).aqi_text;
+            document.getElementById('aqi-status-warning').textContent = `AQI: ${aqi} (${aqiText})`;
+            document.getElementById('precautions-list').innerHTML = '<li>Wear N95 Mask</li><li>Stay indoors</li><li>Use air purifier</li>';
+            document.getElementById('alert-popup').classList.remove('hidden');
+        }
+
+        // ---------------- REPORT FETCHING FROM SUPABASE ----------------
+        async function fetchVerifiedReports() {
+            try {
+                // Fetch reports from Supabase where ai_status is 'VERIFIED'
+                const { data: verifiedData, error } = await supabase
+                    .from('reports')
+                    .select('location_name, description, latitude, longitude, official_status, created_at')
+                    .eq('ai_status', 'VERIFIED')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const newReports = verifiedData.map((r, index) => ({
+                    id: `db-${new Date(r.created_at).getTime()}-${index}`,
+                    location: r.location_name,
+                    desc: r.description,
+                    status: r.official_status || 'Pending',
+                    user: 'System Verified',
+                    lat: r.latitude,
+                    lng: r.longitude,
+                    time: new Date(r.created_at).getTime()
+                }));
+
+                // Combine static reports and newly verified reports
+                allReports = staticReports.concat(newReports);
+
+            } catch (e) {
+                console.error("Error fetching verified reports from DB:", e);
+                // If fetching fails, fall back to just static reports
+                allReports = staticReports;
+            }
+        }
+
+        // ---------------- REPORTS RENDERING & FILTERING ----------------
+        function renderReport(r) {
+            const timeAgo = (() => {
+                const diff = Date.now() - r.time;
+                const min = Math.floor(diff / 60000);
+                return min < 60 ? `${min}m ago` : `${Math.floor(min / 60)}h ago`;
+            })();
+            const cls = r.status === 'Pending' ? 'priority-high' : r.status === 'In Progress' ? 'priority-med' : 'priority-low';
+            return `
+                <div class="report-card">
+                    <div class="flex justify-between items-start mb-1.5">
+                        <h4 class="font-semibold">${r.location}</h4>
+                        <span class="${cls}">${r.status}</span>
+                    </div>
+                    <p class="text-xs text-gray-600 mb-1.5">${r.desc}</p>
+                    <p class="text-xs text-gray-500 mb-2">${timeAgo} • by ${r.user || 'Local User'}</p>
+                    <div class="mini-map" id="map-${r.id}"></div>
+                </div>`;
+        }
+
+        function filterAndRenderReports() {
+            const container = document.getElementById('reports-container');
+            const searchInput = document.getElementById('search-input');
+            const statusFilter = document.getElementById('status-filter');
+
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedStatus = statusFilter.value;
+
+            // 1. Filter reports based on search term and status
+            const filteredReports = allReports.filter(r => {
+                const searchMatch = (r.location && r.location.toLowerCase().includes(searchTerm)) ||
+                    (r.desc && r.desc.toLowerCase().includes(searchTerm));
+
+                const statusMatch = (selectedStatus === 'all') || (r.status === selectedStatus);
+
+                return searchMatch && statusMatch;
+            });
+
+            // Sort reports by time (newest first)
+            filteredReports.sort((a, b) => b.time - a.time);
+
+            container.innerHTML = '';
+
+            // 2. Render filtered reports
+            filteredReports.forEach(r => {
+                const card = document.createElement('div');
+                card.innerHTML = renderReport(r);
+                container.appendChild(card);
+
+                // Initialize Leaflet map
+                setTimeout(() => {
+                    if (document.getElementById(`map-${r.id}`)) {
+                        const map = L.map(`map-${r.id}`).setView([r.lat, r.lng], 15);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                        L.marker([r.lat, r.lng]).addTo(map).bindPopup(r.location);
+                        map.invalidateSize();
+                    }
+                }, 0);
+            });
+
+            // 3. Update counts (based on ALL reports, not just filtered ones)
+            document.getElementById('total-reports-count').textContent = allReports.length;
+            document.getElementById('open-reports-count').textContent = allReports.filter(r => r.status !== 'Resolved').length;
+        }
+
+        // ---------------- INITIALIZATION & EVENT LISTENERS ----------------
+        async function initDashboard() {
+            // 1. Fetch data from Supabase/Static Array
+            await fetchVerifiedReports();
+            // 2. Fetch live AQI data
+            fetchLiveAQI();
+            setInterval(fetchLiveAQI, 5 * 60 * 1000);
+
+            // 3. Set up event listeners for filtering
+            document.getElementById('search-input').addEventListener('input', filterAndRenderReports);
+            document.getElementById('status-filter').addEventListener('change', filterAndRenderReports);
+
+            // 4. Initial rendering of all reports
+            filterAndRenderReports();
+        }
+
+        document.addEventListener('DOMContentLoaded', initDashboard);
+
+        document.getElementById('export-btn').onclick = () => {
+            const csv = ['Location,Description,Status', ...allReports.map(r => `${r.location},"${r.desc}",${r.status}`)];
+            const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'airguard_reports.csv';
+            a.click();
+        };
+    </script>
+</body>
+
+</html>

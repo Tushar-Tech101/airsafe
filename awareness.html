@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Awareness – Air Pollution Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { background: #f9fafb; color: #111827; }
+
+    /* TOP BAR */
+    .topbar {
+      background: #ffffff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); position: sticky; top: 0; z-index: 100;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .logo { font-weight: 700; font-size: 1.5rem; display: flex; align-items: center; gap: 0.75rem; color: #1d4ed8; }
+    .logo img { width: 40px; height: 40px; border-radius: 50%; }
+    .user-info { font-size: 0.875rem; background: #e5e7eb; color: #374151; padding: 0.5rem 1rem; border-radius: 9999px; }
+
+    /* CARD */
+    .card {
+      background: white; border-radius: 1.5rem; padding: 2rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1.5rem;
+    }
+
+    /* TABS */
+    .tabs {
+      display: flex; gap: 0.5rem; margin: 1.5rem 0; flex-wrap: wrap; justify-content: center;
+      padding: 0.5rem; background: #f3f4f6; border-radius: 1rem;
+    }
+    .tab-button {
+      padding: 0.75rem 1.5rem;
+      font-weight: 600;
+      border-radius: 12px;
+      transition: all 0.3s;
+      background: #f8fafc;
+    }
+    .tab-button.active {
+      background: linear-gradient(to right, #3b82f6, #2563eb);
+      color: white;
+      box-shadow: 0 4px 15px rgba(59, 130, 235, 0.4);
+    }
+    .tab-button:hover:not(.active) {
+      background: #dbeafe;
+      color: #2563eb;
+    }
+
+    /* SECTION */
+    .section {
+      background: #f8fafc; padding: 1.5rem; border-radius: 1.25rem; margin-bottom: 1.5rem;
+      border: 1px solid #e2e8f0;
+    }
+
+    .cause { background: linear-gradient(135deg, #fef2f2, #fee2e2); border-color: #fca5a5; }
+    .solution { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-color: #86efac; }
+    .stats { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fbbf24; }
+
+    /* ICON – AB CHHOTA & PERFECT */
+    .icon {
+      width: 2.25rem; height: 2.25rem; background: #3b82f6; color: white; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 1rem; margin-right: 1rem;
+      flex-shrink: 0;
+    }
+    .cause .icon { background: #ef4444; }
+    .solution .icon { background: #10b981; }
+    .stats .icon { background: #f59e0b; }
+
+    /* TABLE */
+    table {
+      width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.875rem;
+    }
+    th, td {
+      padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb;
+    }
+    thead { background: #eff6ff; color: #1d4ed8; }
+
+    /* CTA */
+    .cta {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 2rem; border-radius: 1.5rem;
+      text-align: center; margin-top: 2rem;
+    }
+    .cta button {
+      background: white; color: #3b82f6; padding: 0.75rem 2rem; border-radius: 9999px; font-weight: bold;
+      margin-top: 1rem; transition: transform 0.2s;
+    }
+    .cta button:hover { transform: scale(1.05); }
+  </style>
+</head>
+<body>
+<!-- Header -->
+  <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-xl">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+        </svg>
+        <h1 class="text-xl font-bold">AirGuard Dehradun</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="text-sm text-right">
+          <div id="live-clock" class="font-mono font-semibold"></div>
+          <div class="text-xs opacity-90">Dehradun, UK</div>
+        </div>
+      </div>
+    </div>
+  </header>
+ 
+
+ 
+  <div class="max-w-7xl mx-auto px-4 pt-6 pb-12">
+    <!-- TABS -->
+    <div class="flex flex-wrap gap-3 p-3 bg-white rounded-2xl shadow-lg mb-8 6">
+      <button class="tab-button" onclick="location.href='dashboard.html'">Dashboard</button>
+      <button class="tab-button" onclick="location.href='hot.html'">Hotspots</button>
+      <button class="tab-button" onclick="location.href='report.html'">Report</button>
+      <button class="tab-button active">Awareness</button>
+      <button class="tab-button" onclick="location.href='signup.html'">Sign Up</button>
+      
+    </div>
+  
+    <!-- HERO -->
+    <div class="text-center mb-10">
+      <h1 class="text-4xl md:text-5xl font-bold text-blue-600 mb-3">Know. Act. Breathe.</h1>
+      <p class="text-lg text-gray-600 max-w-3xl mx-auto">Air pollution is real. But so is your power to fight it.</p>
+    </div>
+
+    <!-- STATS -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
+      <div class="stats p-5 rounded-xl text-center">
+        <div class="text-3xl font-bold text-amber-700">1.6M</div>
+        <p class="text-sm font-medium mt-1">Deaths in India (Yearly)</p>
+      </div>
+      <div class="stats p-5 rounded-xl text-center">
+        <div class="text-3xl font-bold text-amber-700">77%</div>
+        <p class="text-sm font-medium mt-1">Cities Exceed WHO Limits</p>
+      </div>
+      <div class="stats p-5 rounded-xl text-center">
+        <div class="text-3xl font-bold text-amber-700">₹2.5L Cr</div>
+        <p class="text-sm font-medium mt-1">Economic Loss</p>
+      </div>
+      <div class="stats p-5 rounded-xl text-center">
+        <div class="text-3xl font-bold text-amber-700">9/10</div>
+        <p class="text-sm font-medium mt-1">People Breathe Polluted Air</p>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="card">
+
+      <!-- 1. WHAT IS AIR POLLUTION -->
+      <div class="section flex items-start">
+        <div class="icon"><i class="fas fa-smog"></i></div>
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold text-blue-700 mb-2">What is Air Pollution?</h2>
+          <p class="leading-relaxed mb-3">
+            Harmful particles and gases in the air that damage health and environment.
+          </p>
+          <div class="grid md:grid-cols-2 gap-3 text-sm">
+            <div class="bg-blue-50 p-3 rounded-lg">PM2.5: Enters lungs & blood</div>
+            <div class="bg-blue-50 p-3 rounded-lg">PM10: Dust, pollen, mold</div>
+            <div class="bg-blue-50 p-3 rounded-lg">NO₂: From vehicles</div>
+            <div class="bg-blue-50 p-3 rounded-lg">Ozone: Smog gas</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. CAUSES -->
+      <!-- 2. SOURCES -->
+      <div class="section cause flex items-start">
+        <div class="icon"><i class="fas fa-industry"></i></div>
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold text-red-700 mb-2">Major Sources</h2>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div class="bg-white p-4 rounded-lg shadow-sm border">
+              <h3 class="font-bold text-red-600">Vehicle Exhaust</h3>
+              <p class="text-sm mt-1">40% of urban NO₂ & PM</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border">
+              <h3 class="font-bold text-red-600">Crop Burning</h3>
+              <p class="text-sm mt-1">Delhi smog in Oct-Nov</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border">
+              <h3 class="font-bold text-red-600">Industries</h3>
+              <p class="text-sm mt-1">Coal plants, brick kilns</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border">
+              <h3 class="font-bold text-red-600">Construction</h3>
+              <p class="text-sm mt-1">Uncovered sites = dust cloud</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. HEALTH EFFECTS -->
+      <div class="section flex items-start">
+        <div class="icon"><i class="fas fa-heartbeat"></i></div>
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold text-orange-700 mb-2">Health Effects</h2>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <h3 class="font-semibold text-orange-600 mb-2">Immediate</h3>
+              <ul class="list-disc pl-5 text-sm space-y-1">
+                <li>Coughing, eye irritation</li>
+                <li>Asthma attacks</li>
+                <li>Headache, fatigue</li>
+              </ul>
+            </div>
+            <div>
+              <h3 class="font-semibold text-orange-600 mb-2">Long-term</h3>
+              <ul class="list-disc pl-5 text-sm space-y-1">
+                <li>Lung cancer</li>
+                <li>Heart disease</li>
+                <li>Reduced life by 5–10 years</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. AQI TABLE -->
+      <div class="section flex items-start">
+        <div class="icon"><i class="fas fa-chart-line"></i></div>
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold text-purple-700 mb-2">AQI Guide</h2>
+          <div class="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>AQI</th>
+                  <th>Level</th>
+                  <th>Advice</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>0–50</td><td class="text-green-600 font-bold">Good</td><td>Enjoy outdoors</td></tr>
+                <tr><td>51–100</td><td class="text-yellow-600 font-bold">Moderate</td><td>Sensitive: limit exposure</td></tr>
+                <tr><td>101–150</td><td class="text-orange-600 font-bold">Unhealthy (Sensitive)</td><td>Reduce activity</td></tr>
+                <tr><td>151–200</td><td class="text-red-600 font-bold">Unhealthy</td><td>Limit outdoor time</td></tr>
+                <tr><td>201–300</td><td class="text-purple-600 font-bold">Very Unhealthy</td><td>Stay indoors</td></tr>
+                <tr><td>300+</td><td class="text-maroon font-bold">Hazardous</td><td>Emergency</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. SOLUTIONS -->
+      <div class="section solution flex items-start">
+        <div class="icon"><i class="fas fa-leaf"></i></div>
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold text-green-700 mb-2">What You Can Do</h2>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div class="bg-white p-4 rounded-lg shadow-sm border">
+              <h3 class="font-bold text-green-600">Public Transport</h3>
+              <p class="text-sm mt-1">1 car off road = 4.6 tons CO₂ saved/year</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border">
+              <h3 class="font-bold text-green-600">Plant Trees</h3>
+              <p class="text-sm mt-1">1 tree = 22 kg CO₂ absorbed/year</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border">
+              <h3 class="font-bold text-green-600">Report Pollution</h3>
+              <p class="text-sm mt-1">Use our app → instant alert</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow-sm border">
+              <h3 class="font-bold text-green-600">N95 Mask</h3>
+              <p class="text-sm mt-1">Blocks 95% PM2.5</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. MYTHS -->
+      <div class="section flex items-start">
+        <div class="icon"><i class="fas fa-times-circle"></i></div>
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold text-indigo-700 mb-2">Myths vs Facts</h2>
+          <div class="space-y-3">
+            <div class="bg-indigo-50 p-4 rounded-lg">
+              <p class="font-semibold text-indigo-700">Myth: "Only old people are affected"</p>
+              <p class="text-sm mt-1">Fact: Children & pregnant women are most vulnerable.</p>
+            </div>
+            <div class="bg-indigo-50 p-4 rounded-lg">
+              <p class="font-semibold text-indigo-700">Myth: "AC keeps pollution out"</p>
+              <p class="text-sm mt-1">Fact: AC recirculates indoor air — use HEPA filter.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="cta">
+        <h2 class="text-3xl font-bold mb-2">Be a Pollution Fighter!</h2>
+        <p class="text-lg mb-4">Report. Track. Save Lives.</p>
+        <button onclick="location.href='report.html'">Report Pollution Now</button>
+      </div>
+
+    </div>
+
+    </div>
+  </div>
+</body>
+</html>
+<!-- CHATBOT BUTTON -->
+  <button id="chatbot-btn" class="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-all duration-300 z-50 flex items-center justify-center border-4 border-white">
+    <img src="https://cdn-icons-png.flaticon.com/512/4712/4712027.png" alt="Health Bot" class="w-8 h-8 animate-pulse">
+  </button>
+
+  <!-- CHATBOT MODAL -->
+  <div id="chatbot-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto overflow-hidden flex flex-col h-[90vh] max-h-[600px]">
+      <div class="bg-gradient-to-r from-blue-600 to-cyan-500 text-white p-4 flex justify-between items-center">
+        <h3 class="font-bold text-lg">Health AI Assistant</h3>
+        <button onclick="closeModal()" class="text-white hover:text-gray-200 text-2xl">x</button>
+      </div>
+      <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50"></div>
+      <div class="p-3 border-t bg-gray-100">
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <button class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200" onclick="quickAsk('What to do when AQI is 150?')">AQI 150</button>
+          <button class="text-xs bg-green-100 text-green-700 px-3 py-2 rounded-lg font-medium hover:bg-green-200" onclick="quickAsk('Precautions for children')">Kids</button>
+          <button class="text-xs bg-orange-100 text-orange-700 px-3 py-2 rounded-lg font-medium hover:bg-orange-200" onclick="quickAsk('How to wear N95 mask?')">N95 Mask</button>
+          <button class="text-xs bg-purple-100 text-purple-700 px-3 py-2 rounded-lg font-medium hover:bg-purple-200" onclick="quickAsk('How to reduce indoor pollution?')">Indoor Tips</button>
+        </div>
+        <div class="flex gap-1">
+          <input id="user-input" type="text" placeholder="Ask health tips..." class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" autocomplete="off">
+          <button onclick="sendMessage()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-lg font-bold text-sm">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHATBOT SCRIPT -->
+  <script>
+    const GEMINI_API_KEY = "AIzaSyBVVbAD7NN_gJozwIY783ncQwwR_GDFwnQ"; // Apni real key daalo
+
+    document.getElementById('chatbot-btn').onclick = () => {
+      document.getElementById('chatbot-modal').classList.remove('hidden');
+      if (!document.querySelector('#chat-messages > div')) {
+        addBotMsg('Hi! I can help with air pollution health tips, AQI precautions, and safety advice.');
+      }
+    };
+
+    function closeModal() {
+      document.getElementById('chatbot-modal').classList.add('hidden');
+    }
+
+    function addMsg(text, type) {
+      const chat = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = type === 'user' ? 'text-right' : 'text-left';
+      div.innerHTML = `<div class="inline-block max-w-xs p-3 rounded-2xl text-sm ${type === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-800'}">${text}</div>`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+    function addBotMsg(text) { addMsg(text, 'bot'); }
+
+    async function sendMessage() {
+      const input = document.getElementById('user-input');
+      const q = input.value.trim();
+      if (!q) return;
+      addMsg(q, 'user');
+      input.value = '';
+      addBotMsg('Thinking...');
+
+      if (GEMINI_API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
+        document.querySelector('#chat-messages > div:last-child').remove();
+        addBotMsg('Error: Please add your real Gemini API key!');
+        return;
+      }
+
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Answer in clear, short English. Only about air pollution health & precautions: ${q}` }] }]
+          })
+        });
+        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+        const data = await res.json();
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.';
+        document.querySelector('#chat-messages > div:last-child').remove();
+        addBotMsg(reply);
+      } catch (e) {
+        document.querySelector('#chat-messages > div:last-child').remove();
+        addBotMsg(`Error: ${e.message}`);
+      }
+    }
+
+    function quickAsk(q) {
+      document.getElementById('user-input').value = q;
+      sendMessage();
+    }
+
+    document.getElementById('user-input').addEventListener('keypress', e => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>
